@@ -2,33 +2,84 @@ pipeline {
 	agent any
 	stages {
 
-		stage('Create Kubernetes Cluster') {
+		stage('Lint HTML') {
 			steps {
-				withAWS(region:'us-east-2', credentials:'aws-id') {
+				sh 'tidy -q -e *.html'
+			}
+		}
+		
+		stage('Build Docker Image') {
+			steps {
+				withCredentials([[$class: 'UsernamePasswordMultiBinding', credentialsId: 'dockerhub', usernameVariable: 'DOCKER_USERNAME', passwordVariable: 'DOCKER_PASSWORD']]){
 					sh '''
-						eksctl create cluster \
-						--name udacitycluster1 \
-						--version 1.14 \
-						--nodegroup-name standard-workers \
-						--node-type t2.small \
-						--nodes 2 \
-						--nodes-min 1 \
-						--nodes-max 3 \
-						--node-ami auto \
-						--region us-east-2 \
-						--zones us-east-2a \
-						--zones us-east-2b \
-						--zones us-east-2c \
+						docker build -t sureshgtechno/udacity-capstone1 .
 					'''
 				}
 			}
 		}
 
-		stage('Configure kubectl') {
+		stage('Push Image To Dockerhub') {
+			steps {
+				withCredentials([[$class: 'UsernamePasswordMultiBinding', credentialsId: 'dockerhub', usernameVariable: 'DOCKER_USERNAME', passwordVariable: 'DOCKER_PASSWORD']]){
+					sh '''
+						docker login -u $DOCKER_USERNAME -p $DOCKER_PASSWORD
+						docker push sureshgtechno/udacity-capstone1
+					'''
+				}
+			}
+		}
+
+		stage('Set Current kubectl Context') {
 			steps {
 				withAWS(region:'us-east-2', credentials:'aws-id') {
 					sh '''
-						aws eks --region us-east-2 update-kubeconfig --name udacitycluster1
+						kubectl config use-context arn:aws:eks:us-east-2:821556368364:cluster/udacitycluster1
+					'''
+				}
+			}
+		}
+
+		stage('Deploy Blue Container') {
+			steps {
+				withAWS(region:'us-east-2', credentials:'aws-id') {
+					sh '''
+						kubectl apply -f ./blue-replication-controller.yml
+					'''
+				}
+			}
+		}
+
+		stage('Deploy green container') {
+			steps {
+				withAWS(region:'us-east-2', credentials:'aws-id') {
+					sh '''
+						kubectl apply -f ./green-replication-controller.yml
+					'''
+				}
+			}
+		}
+
+		stage('Create Service Pointing to Blue Replication Controller') {
+			steps {
+				withAWS(region:'us-east-2', credentials:'aws-id') {
+					sh '''
+						kubectl apply -f ./blue-service.yml
+					'''
+				}
+			}
+		}
+
+		stage('Approval for Redirection') {
+            steps {
+                input "Ready to redirect traffic to green replication controller?"
+            }
+        }
+
+		stage('Create Service Pointing to Green Replication Controller') {
+			steps {
+				withAWS(region:'us-east-2', credentials:'aws-id') {
+					sh '''
+						kubectl apply -f ./green-service.yml
 					'''
 				}
 			}
