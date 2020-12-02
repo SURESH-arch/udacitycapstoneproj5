@@ -10,11 +10,13 @@ Udacity Cloud DevOps Capstone Project. Project Overview Blue /green deployment
 
     Added AWS credentials in Jenkins
 
-    Connected to GitHub https://github.com/SURESH-arch/udacitycapstone.git
+    Connected to GitHub https://github.com/SURESH-arch/udacitycapstoneproj5.git
 
     Created EKS cluster Configured kubectl using CI/CD pipeline
 
     Created Docker credentials
+    
+    Lint check failure screenshot attached
 
     In the final step build the pipeline for docker push and Service Pointing to Blue Replication Controller is build and after approval green pod will run and final step is completed.
 
